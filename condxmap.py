@@ -2,8 +2,8 @@
 # -*- coding: latin-1 -*-
 from __future__ import with_statement
 #*------------------------------------------------------------------------------------------------------
-#* wsprmap.py
-#* Plot WSPR reports at http://www.wsprnet.org for a given period
+#* condxmap.py
+#* Plot PSKInformer reports at http://pskreporter.info
 #*
 #* By Dr. Pedro E. Colla (LU7DID)
 #*------------------------------------------------------------------------------------------------------
@@ -166,43 +166,11 @@ while i < len(sys.argv):
    if sys.argv[i].upper() == '--H':
       print('condxmap versión %s build %s' % (VER,BUILD))
       print('   condxmap [--v] [--h]')
-      print('Consolidación de archivos pdf en un único pdf')
-      print('Se emite la tabla de contenidos (manifesto) del pdf construido por std out')
-      print('   --i  In Path   ')
-      print('   --o  Out Path  ')
-      print('   --v  Verbose   Emite diagnósticos e información de debug')
-      print('   --h  Help      Emite este mensaje')
-      print('Requiere instalados paquetes python v3.7.1-amd64 o superior y PyPDFD2 v1.26.0 o superior')
-      print('Versión corrientemente instalada %s' % (sys.version))
       quit()
    if (sys.argv[i].upper() == '--V') or (sys.argv[i].upper() == '-V'):
       print_msg('main: Verbose mode activated')
       v=True
 
-   if (sys.argv[i].upper() == '--I') or (sys.argv[i].upper() == '-I'):
-      i=i+1
-      inpath=sys.argv[i].upper()
-      print_msg('main: In Path %s' % inpath)
-   if (sys.argv[i].upper() == '--M') or (sys.argv[i].upper() == '-M'):
-      i=i+1
-      modeGIF=sys.argv[i].upper()
-      if (modeGIF != "MARBLE" or modeGIF !="SHADED"):
-         modeGIF="MARBLE"
-      print_msg('main: GIF mode is %s' % modeGIF)
-   if (sys.argv[i].upper() == '--G') or (sys.argv[i].upper() == '-G'):
-      i=i+1
-      outGIF=sys.argv[i].upper()
-      print_msg('main: GIF Path %s' % outGIF)
-   if (sys.argv[i].upper() == '--N') or (sys.argv[i].upper() == '-N'):
-      i=i+1
-      nameGIF=sys.argv[i].upper()
-      print_msg('main: name of GIF %s' % nameGIF)
-
-   if (sys.argv[i].upper() == '--O') or (sys.argv[i].upper() == '-O'):
-      i=i+1
-      outpath=sys.argv[i].upper()
-      print_msg('main: Out Path %s' % outpath)
-  
    i=i+1
 
 print_msg('version es %s' % (sys.version))
@@ -215,7 +183,6 @@ createFolder(outpath)
 #*------ Estructura para almacenar los spots por banda horaria
 condx = {i: [] for i in range(0, 24)}
 
-
 #*---------------------------------------------------------------------------------------------------
 # Process WSPRNet dataset with awk '{print "plotMap(map,\""$7"\",\""$10"\")"}' wsprdata.lst > set.py
 #*---------------------------------------------------------------------------------------------------
@@ -223,7 +190,6 @@ condx = {i: [] for i in range(0, 24)}
 hour=0
 
 f = datetime.datetime.now()
-#x = datetime.datetime.utcnow()
 x = datetime.datetime.now(datetime.UTC)
 print("Initialization of maps LOCAL  %s -- UTC %s" % (f.strftime("%b %d %Y %H:%M:%S"),x.strftime("%b %d %Y %H:%M:%S")))
 map=buildMap();
@@ -264,9 +230,30 @@ for h in range(24):  # Iterates from 0 to 23
        print(f"No hay spots guardados para la hora {h}.")
     else:
        n=n+1
-       print(f"\nSpots para la  hora {h}:")
+       print(f"\nSpots para la  hora {h} datetime UTC{f}")
+       x = datetime.datetime.now(datetime.UTC)
+       f = datetime.datetime(x.year,x.month,x.day,h,0,0)
+       CS=map.nightshade(f)
+       if (modeGIF=="SHADED"):
+          map.shadedrelief(scale=0.1)
+       else:
+          map.bluemarble(scale=0.1)
+       plt.title("Hour %d:00Z" % (h))
+       if len(str(h)) == 1:
+          stHour="0"+str(h)
+       else:
+          stHour=str(h)
+       plt.savefig(outpath+"/condx"+stHour+".png")
+       plt.close("all")
+       print("Image generation for hour %s:00Z has been completed" % (h))
+       map=None
+       map=buildMap()
+
+
+
        for i, (timestamp, toCall, band, freq, toLocator, fromCall, fromLocator) in enumerate(qso, start=1):
            print(f"       {i}. ({timestamp!r}, {toCall!r}, {band!r}, {freq!r},{toLocator!r},{fromCall},{fromLocator})")
+           plotMap(map,toLocator,fromLocator)
 
 
     print(f"total number of spots {n} number of JSON records {data[0]["records"]}")
@@ -274,29 +261,6 @@ for h in range(24):  # Iterates from 0 to 23
 #    while hour!=lastHour:
 #
 #
-#      #x = datetime.datetime.utcnow()
-#      print(f"year({x.year}) month({x.month}) day({x.day}) lasthour({lastHour})")
-#      x = datetime.datetime.now(datetime.UTC)
-#      f = datetime.datetime(x.year,x.month,x.day,lastHour,0,0)
-#      print_msg("Band %sMHz Processing spots for hour %d Spots(%d)\n " % (band,lastHour,c))
-#
-#      CS=map.nightshade(f)
-#      if (modeGIF=="SHADED"):
-#         map.shadedrelief(scale=0.1)
-#      else:
-#         map.bluemarble(scale=0.1)
-#
-#      plt.title("Band %s MHz Hour %d:00Z" % (band,lastHour))
-#      if len(str(lastHour)) == 1:
-#         stHour="0"+str(lastHour)
-#      else:
-#         stHour=str(lastHour)
-#      print_msg("main: saving file %s" % (outpath+"/condx"+stHour+".png"))
-#      plt.savefig(outpath+"/condx"+stHour+".png")
-#      plt.close("all")
-#      print("Image generation for hour %s:00Z has been completed Spots(%d)" % (lastHour,c))
-#      map=None
-#      map=buildMap()
 #
 #      lastHour=lastHour+1
 #      c=0
@@ -304,7 +268,6 @@ for h in range(24):  # Iterates from 0 to 23
 #          break
 #    if hour==lastHour:
 #       c=c+1
-#       plotMap(map,toLocator,fromLocator)
 #
 #*---- Completes till midnight is CONDX ends before
 
