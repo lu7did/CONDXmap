@@ -5,6 +5,9 @@ from __future__ import with_statement
 #* condxmap.py
 #* Plot PSKInformer reports at http://pskreporter.info
 #*
+#*
+#*     python condxmap.py --input {json data} --gif {path to store graph files}
+#*
 #* By Dr. Pedro E. Colla (LU7DID)
 #*------------------------------------------------------------------------------------------------------
 import sys
@@ -12,7 +15,9 @@ import csv
 import time
 import matplotlib.pyplot as plt
 import numpy as np
+
 from mpl_toolkits.basemap import Basemap
+
 import datetime
 import zipfile
 import os
@@ -23,6 +28,8 @@ import subprocess
 import os
 import imageio
 from collections import defaultdict
+import json
+
 #*------------------------------------------------------------------------------------------
 #* Print message utility (DEBUG mode)
 #*------------------------------------------------------------------------------------------
@@ -94,18 +101,28 @@ def GridToLatLong(strMaidenHead):
     (strStartLon, strEndLon) = GetLon(ONE, THREE, FIVE)
     (strStartLat, strEndLat) = GetLat(TWO, FOUR, SIX)
 
-    #print ('Start Lon = ' + strStartLon)
-    #print ('End   Lon = ' + strEndLon)
-    #print ()
-    #print ('Start Lat = ' + strStartLat)
-    #print ('End   Lat = ' + strEndLat)
-
     return strStartLon,strStartLat
+#*------------------------------------------------------------------------------------------------------
+#* Transform band into a line of a pre-defined colour
+#*------------------------------------------------------------------------------------------------------
+def band2color(band):
+
+    match band:
+        case "40m":
+            return 'c'
+        case "20m":
+            return 'y'
+        case "15m":
+            return 'g'
+        case "10m":
+            return 'm'
+        case _:
+            return 'c'
 #*------------------------------------------------------------------------------------------------------
 #* Draw a line in the map given initial and ending coordinates expressed as Maindenhead locator
 #*------------------------------------------------------------------------------------------------------
 
-def plotMap(map,gFrom,gTo):
+def plotMap(map,band,gFrom,gTo):
 
     lonFrom,latFrom=GridToLatLong(gFrom.strip())
     lonTo,latTo=GridToLatLong(gTo.strip())
@@ -116,69 +133,65 @@ def plotMap(map,gFrom,gTo):
     laFrom=float(latFrom)
     laTo=float(latTo)
 
-
     lat = [laFrom,laTo] 
     lon = [loFrom,loTo] 
 
 
+    r=band2color(band)
     x, y = map(lon, lat)
-    map.plot(x, y, 'o-', markersize=1, linewidth=1) 
+    map.plot(x, y, 'o-', color=r,markersize=1, linewidth=1) 
     return
 
 #*------------------------------------------------------------------------------------------------------
 #* Build a map (Mercator projection)
 #*------------------------------------------------------------------------------------------------------
-
 def buildMap():
     m = Basemap(projection='merc',llcrnrlon=-170,llcrnrlat=-75,urcrnrlon=170,urcrnrlat=75,resolution='l')
 
 
-    m.drawmeridians(np.arange(0,360,30))
-    m.drawparallels(np.arange(-90,90,30))
-    m.drawcoastlines(linewidth=0.25)
-    m.drawcountries(linewidth=0.25)
+    #m.drawmeridians(np.arange(0,360,30))
+    #m.drawparallels(np.arange(-90,90,30))
+    #m.drawcoastlines(linewidth=0.25)
+    #m.drawcountries(linewidth=0.25)
     return m
 
 
 #*------------------------------------------------------------------------------------------------------
 #* MAIN 
 #*------------------------------------------------------------------------------------------------------
-
-
-lastHour=0
-c=0
-MH= 'GF05te'
-VER='1.6'
-BUILD='10'
-script = sys.argv[0]
+scriptname = sys.argv[0]
+infile="condx_hour"
 i = 0
 v=False
-inpath='.'
-outpath='.'
-outGIF='.'
+
+gifpath='./out'
+jsonfile=''
+
 modeGIF='MARBLE'
 nameGIF='CONDX'
 n=0
 
 #*----- Procesa argumentos
 while i < len(sys.argv): 
-   print_msg('Argument(%d) --> %s' % (i,sys.argv[i].upper()))
+
    if sys.argv[i].upper() == '--H':
       print('condxmap versión %s build %s' % (VER,BUILD))
-      print('   condxmap [--v] [--h]')
+      print('      python condxmap.py [--v] [--h] --input {json file} --gif {graph files directory}')
       quit()
    if (sys.argv[i].upper() == '--V') or (sys.argv[i].upper() == '-V'):
-      print_msg('main: Verbose mode activated')
       v=True
+   if (sys.argv[i].upper() == '--INPUT'):
+      jsonfile=sys.argv[i+1]
+      i=i+1
+   if (sys.argv[i].upper() == '--GIF'):
+      gifpath=sys.argv[i+1]
+      
+      i=i+1
 
    i=i+1
 
-print_msg('version es %s' % (sys.version))
-print_msg('verbose status %s ' % v)
-print_msg("*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=")
-createFolder(outpath)
-
-#map = Basemap(projection='ortho',lat_0=-34.6,lon_0=-58.4,resolution='c')
+if jsonfile == '':
+   print("Json file must be informed, see condxmap --help")
 
 #*------ Estructura para almacenar los spots por banda horaria
 condx = {i: [] for i in range(0, 24)}
@@ -193,13 +206,9 @@ f = datetime.datetime.now()
 x = datetime.datetime.now(datetime.UTC)
 print("Initialization of maps LOCAL  %s -- UTC %s" % (f.strftime("%b %d %Y %H:%M:%S"),x.strftime("%b %d %Y %H:%M:%S")))
 map=buildMap();
-print("Creating graphics at (%s) GIF(%s)" % (outpath,outGIF)) 
 
-import json
 
-filename = './data/test.json'
-
-with open(filename, 'r') as f:
+with open(jsonfile, 'r') as f:
     data = json.load(f)
 
 spots=data[0]["spot"]
@@ -211,8 +220,8 @@ for i, entry in enumerate(spots, start=1):
     fromCall=entry["mycall"]
     timestamp=entry["time"]
     freq=entry["freq"]
-    toLocator=entry["grid"]
-    fromLocator=entry["migrid"]
+    toLocator=entry["migrid"]
+    fromLocator=entry["grid"]
 
 #*-------------------------------------------------------------------------------------
 #* Scan data and build datasets
@@ -220,17 +229,14 @@ for i, entry in enumerate(spots, start=1):
     hour=int(timestamp.split(':')[0])
     qso = (timestamp, toCall, band, freq, toLocator, fromCall, fromLocator)
     condx[hour].append(qso)
-    print("Hour(%s) Time(%s) toCall(%s) freq(%s) locatorTo(%s) fromCall(%s) locatorFrom(%s)" % (hour,timestamp,toCall,freq,toLocator,fromCall,fromLocator))
 
 
 for h in range(24):  # Iterates from 0 to 23
-    print(h)
     qso = condx.get(h, [])
     if not qso:
        print(f"No hay spots guardados para la hora {h}.")
     else:
        n=n+1
-       print(f"\nSpots para la  hora {h} datetime UTC{f}")
        x = datetime.datetime.now(datetime.UTC)
        f = datetime.datetime(x.year,x.month,x.day,h,0,0)
        CS=map.nightshade(f)
@@ -238,72 +244,29 @@ for h in range(24):  # Iterates from 0 to 23
           map.shadedrelief(scale=0.1)
        else:
           map.bluemarble(scale=0.1)
-       plt.title("Hour %d:00Z" % (h))
+       plt.title("Propagation Report Hour %d:00Z" % (h))
        if len(str(h)) == 1:
           stHour="0"+str(h)
        else:
           stHour=str(h)
-       plt.savefig(outpath+"/condx"+stHour+".png")
+       plt.savefig(gifpath+"/condx_"+stHour+".png")
        plt.close("all")
-       print("Image generation for hour %s:00Z has been completed" % (h))
        map=None
        map=buildMap()
 
-
-
        for i, (timestamp, toCall, band, freq, toLocator, fromCall, fromLocator) in enumerate(qso, start=1):
-           print(f"       {i}. ({timestamp!r}, {toCall!r}, {band!r}, {freq!r},{toLocator!r},{fromCall},{fromLocator})")
-           plotMap(map,toLocator,fromLocator)
+           plotMap(map,band,toLocator,fromLocator)
+           n=n+1
 
-
-    print(f"total number of spots {n} number of JSON records {data[0]["records"]}")
-#*--- Identify change of the hour
-#    while hour!=lastHour:
-#
-#
-#
-#      lastHour=lastHour+1
-#      c=0
-#      if lastHour>23:
-#          break
-#    if hour==lastHour:
-#       c=c+1
-#
-#*---- Completes till midnight is CONDX ends before
-
-#while lastHour<24:
-#   x = datetime.datetime.now(datetime.UTC)
-#
-#   print_msg("----> Band %sMHz Processing spots for hour %d Spots(%d)" % (band,lastHour,c))
-#   f = datetime.datetime(x.year,x.month,x.day,lastHour,0,0)
-#
-#   CS=map.nightshade(f)
-#   if modeGIF == "SHADED":
-#      map.shadedrelief(scale=0.10)
-#   else:
-#      map.bluemarble(scale=0.10)
-#
-#   plt.title("Band %s MHz Hour %d:00Z" % (band,lastHour))
-#   if len(str(lastHour)) == 1:
-#      stHour="0"+str(lastHour)
-#   else:
-#      stHour=str(lastHour)
-#   print_msg("main: saving file %s" % (outpath+"/condx"+stHour+".png"))
-#   plt.savefig(outpath+"/condx"+stHour+".png")
-#   plt.close("all")
-#   print("Image generation for hour %s:00Z has been completed Spot(0)" % (lastHour))
-#   lastHour=lastHour+1
-#   map=None
-#   map=buildMap()
+print(f"total number of spots {n} number of JSON records {data[0]["records"]}")
 
 #*---------------------------------------------------------------------------------------------
 #* Create GIF file 
 #*---------------------------------------------------------------------------------------------
-#print_msg("Creating GIF at path: %s" % outGIF)
-#images = []
-#for file_name in sorted(os.listdir(outGIF)):
-#    if file_name.endswith('.png'):
-#        file_path = os.path.join(outGIF, file_name)
-#        print("GIF Generation including file %s" % file_path)
-#        images.append(imageio.imread(file_path))
-#imageio.mimsave(outGIF+'/'+nameGIF+'.gif', images, duration=0.5)
+images = []
+
+for file_name in sorted(os.listdir(gifpath)):
+    if file_name.endswith('.png'):
+       images.append(imageio.imread(gifpath+"/"+file_name))
+
+imageio.mimsave(gifpath+'/'+nameGIF+'.gif', images, fps=0.5)

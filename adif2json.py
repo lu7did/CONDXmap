@@ -43,7 +43,39 @@ def float2int(float_string):
 #*-------------------------------------------------------------------------------------
 def removelines(value):
     return value.replace('\n','')
-
+#*-------------------------------------------------------------------------------------
+#* convert from freq to ham radio band
+#*-------------------------------------------------------------------------------------
+def freq2band(freq):
+    b="10m"
+    match freq.split('.')[0]:
+        case 1:  
+           b="160m"
+        case 3:
+           b="80m"
+        case 7:
+           b="40m"
+        case 10:
+           b="30m" 
+        case 14:  
+           b="20m"
+        case 18:
+           b="17m"
+        case 21:
+           b="15m"  
+        case 24:
+           b="12m"
+        case 28: 
+           b="10m"
+        case 50:
+           b="6m" 
+        case 144:
+           b="2m" 
+        case 220:
+           b="1.3m"
+        case "430":
+           b="70cm"
+    return b
 
 #*-------------------------------------------------------------------------------------
 #* HTML Parser
@@ -104,7 +136,7 @@ except Exception as ex:
 n=0
 bFirst=True 
 msg=''
-
+n28=0
 #*---------------------------------------------------*
 #* Inicializa JSON structure                         *
 #*-------------------------------------------------- *
@@ -141,41 +173,12 @@ try:
      time_formatted = dt_object.strftime("%H:%M:%S")
 
 #*---------------------------------------------------*
-#* Convert frequency into ham radio band             *
-#*---------------------------------------------------*
      freq=float2int(x['FREQ'])
-     band="10"
-     match freq:
-        case 1:
-           band="160m"
-        case 3:
-           band="80m"
-        case 7:
-           band="40m"
-        case 10:
-           band="30m"
-        case 14:
-           band="20m"
-        case 18:
-           band="17m"
-        case 21:
-           band="15m"
-        case 24:
-           band="12m"
-        case 28:
-           band="10m"
-        case 50:
-           band="6m"
-        case 144:
-           band="2m"
-        case 220:
-           band="1.3m"
-        case "430":
-           band="70cm"
+     band=freq2band(freq)
 #*---------------------------------------------------*
 #* Create a JSON payload based on request            *
 #*-------------------------------------------------- *
-     
+
      data_string=(f"call:{sucall}, mode:{modo}, band:{band},freq:{freq},mycall:{micall},date:{date_yyyy_mm_dd},time:{time_formatted},migrid:{miGrid},grid:{Grid}")
 
 # Initialize an empty dictionary to store the key-value pairs
