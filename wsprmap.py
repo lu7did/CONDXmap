@@ -12,8 +12,6 @@ import csv
 import time
 import matplotlib.pyplot as plt
 import numpy as np
-#from mpl_toolkits.basemap import Basemap
-#from mpl_toolkits import Basemap
 from mpl_toolkits.basemap import Basemap
 import datetime
 import zipfile
@@ -24,7 +22,7 @@ import shutil
 import subprocess
 import os
 import imageio
-
+from collections import defaultdict
 #*------------------------------------------------------------------------------------------
 #* Print message utility (DEBUG mode)
 #*------------------------------------------------------------------------------------------
@@ -160,12 +158,14 @@ outpath='.'
 outGIF='.'
 modeGIF='MARBLE'
 nameGIF='CONDX'
+n=0
 
+#*----- Procesa argumentos
 while i < len(sys.argv): 
    print_msg('Argument(%d) --> %s' % (i,sys.argv[i].upper()))
    if sys.argv[i].upper() == '--H':
-      print('cmeclist versión %s build %s' % (VER,BUILD))
-      print('   cmeclist [--v] [--h]')
+      print('condxmap versión %s build %s' % (VER,BUILD))
+      print('   condxmap [--v] [--h]')
       print('Consolidación de archivos pdf en un único pdf')
       print('Se emite la tabla de contenidos (manifesto) del pdf construido por std out')
       print('   --i  In Path   ')
@@ -211,6 +211,11 @@ print_msg("*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*
 createFolder(outpath)
 
 #map = Basemap(projection='ortho',lat_0=-34.6,lon_0=-58.4,resolution='c')
+
+#*------ Estructura para almacenar los spots por banda horaria
+condx = {i: [] for i in range(0, 24)}
+
+
 #*---------------------------------------------------------------------------------------------------
 # Process WSPRNet dataset with awk '{print "plotMap(map,\""$7"\",\""$10"\")"}' wsprdata.lst > set.py
 #*---------------------------------------------------------------------------------------------------
@@ -218,105 +223,124 @@ createFolder(outpath)
 hour=0
 
 f = datetime.datetime.now()
-x = datetime.datetime.utcnow()
-
+#x = datetime.datetime.utcnow()
+x = datetime.datetime.now(datetime.UTC)
 print("Initialization of maps LOCAL  %s -- UTC %s" % (f.strftime("%b %d %Y %H:%M:%S"),x.strftime("%b %d %Y %H:%M:%S")))
 map=buildMap();
 print("Creating graphics at (%s) GIF(%s)" % (outpath,outGIF)) 
+
+import json
+
+filename = './data/test.json'
+
+with open(filename, 'r') as f:
+    data = json.load(f)
+
+spots=data[0]["spot"]
+for i, entry in enumerate(spots, start=1):
+
+    call = entry["call"]
+    band = entry["band"]
+    toCall=entry["call"]
+    fromCall=entry["mycall"]
+    timestamp=entry["time"]
+    freq=entry["freq"]
+    toLocator=entry["grid"]
+    fromLocator=entry["migrid"]
+
 #*-------------------------------------------------------------------------------------
 #* Scan data and build datasets
 #*-------------------------------------------------------------------------------------
-#for row in csv.reader(iter(sys.stdin.readline, ''),delimiter=','):
-for row in csv.reader(iter(sys.stdin.readline, '')):
-
-#*--- Parse data out of the dataset
-    print(f"CSV({row})")
-    #print_msg("Data: %s" % row)
-
-    timestamp=row[0]
-    toCall=row[1]
-    freq=row[2]
-    SNR=row[3]
-    DT=row[4]
-    toLocator=row[5]
-    pwr=row[6]
-    fromCall=row[7]
-    fromLocator=row[8]
     hour=int(timestamp.split(':')[0])
-    band=freq.split('.')[0]
+    qso = (timestamp, toCall, band, freq, toLocator, fromCall, fromLocator)
+    condx[hour].append(qso)
+    print("Hour(%s) Time(%s) toCall(%s) freq(%s) locatorTo(%s) fromCall(%s) locatorFrom(%s)" % (hour,timestamp,toCall,freq,toLocator,fromCall,fromLocator))
 
-    print_msg("Hour(%s) Time(%s) toCall(%s) freq(%s) SNR(%s) DT(%s) locatorTo(%s) pwr(%s) fromCall(%s) locatorFrom(%s)" % (hour,timestamp,toCall,freq,SNR,DT,toLocator,pwr,fromCall,fromLocator))
 
+for h in range(24):  # Iterates from 0 to 23
+    print(h)
+    qso = condx.get(h, [])
+    if not qso:
+       print(f"No hay spots guardados para la hora {h}.")
+    else:
+       n=n+1
+       print(f"\nSpots para la  hora {h}:")
+       for i, (timestamp, toCall, band, freq, toLocator, fromCall, fromLocator) in enumerate(qso, start=1):
+           print(f"       {i}. ({timestamp!r}, {toCall!r}, {band!r}, {freq!r},{toLocator!r},{fromCall},{fromLocator})")
+
+
+    print(f"total number of spots {n} number of JSON records {data[0]["records"]}")
 #*--- Identify change of the hour
-
-    while hour!=lastHour:
-
-
-      x = datetime.datetime.utcnow()
-      f = datetime.datetime(x.year,x.month,x.day,lastHour,0,0)
-      print_msg("Band %sMHz Processing spots for hour %d Spots(%d)\n " % (band,lastHour,c))
-
-      CS=map.nightshade(f)
-      if (modeGIF=="SHADED"):
-         map.shadedrelief(scale=0.1)
-      else:
-         map.bluemarble(scale=0.1)
-
-      plt.title("Band %s MHz Hour %d:00Z" % (band,lastHour))
-      if len(str(lastHour)) == 1:
-         stHour="0"+str(lastHour)
-      else:
-         stHour=str(lastHour)
-      print_msg("main: saving file %s" % (outpath+"/condx"+stHour+".png"))
-      plt.savefig(outpath+"/condx"+stHour+".png")
-      plt.close("all")
-      print("Image generation for hour %s:00Z has been completed Spots(%d)" % (lastHour,c))
-      map=None
-      map=buildMap()
-
-      lastHour=lastHour+1
-      c=0
-      if lastHour>24:
-          print_msg("EoF\n")
-          exit(0)
-    if hour==lastHour:
-       c=c+1
-       plotMap(map,toLocator,fromLocator)
-
+#    while hour!=lastHour:
+#
+#
+#      #x = datetime.datetime.utcnow()
+#      print(f"year({x.year}) month({x.month}) day({x.day}) lasthour({lastHour})")
+#      x = datetime.datetime.now(datetime.UTC)
+#      f = datetime.datetime(x.year,x.month,x.day,lastHour,0,0)
+#      print_msg("Band %sMHz Processing spots for hour %d Spots(%d)\n " % (band,lastHour,c))
+#
+#      CS=map.nightshade(f)
+#      if (modeGIF=="SHADED"):
+#         map.shadedrelief(scale=0.1)
+#      else:
+#         map.bluemarble(scale=0.1)
+#
+#      plt.title("Band %s MHz Hour %d:00Z" % (band,lastHour))
+#      if len(str(lastHour)) == 1:
+#         stHour="0"+str(lastHour)
+#      else:
+#         stHour=str(lastHour)
+#      print_msg("main: saving file %s" % (outpath+"/condx"+stHour+".png"))
+#      plt.savefig(outpath+"/condx"+stHour+".png")
+#      plt.close("all")
+#      print("Image generation for hour %s:00Z has been completed Spots(%d)" % (lastHour,c))
+#      map=None
+#      map=buildMap()
+#
+#      lastHour=lastHour+1
+#      c=0
+#      if lastHour>23:
+#          break
+#    if hour==lastHour:
+#       c=c+1
+#       plotMap(map,toLocator,fromLocator)
+#
 #*---- Completes till midnight is CONDX ends before
 
-while lastHour<24:
-   x = datetime.datetime.utcnow()
-   f = datetime.datetime(x.year,x.month,x.day,lastHour,0,0)
-   print_msg("Band %sMHz Processing spots for hour %d Spots(%d)" % (band,lastHour,c))
-
-   CS=map.nightshade(f)
-   if modeGIF == "SHADED":
-      map.shadedrelief(scale=0.10)
-   else:
-      map.bluemarble(scale=0.10)
-
-   plt.title("Band %s MHz Hour %d:00Z" % (band,lastHour))
-   if len(str(lastHour)) == 1:
-      stHour="0"+str(lastHour)
-   else:
-      stHour=str(lastHour)
-   print_msg("main: saving file %s" % (outpath+"/condx"+stHour+".png"))
-   plt.savefig(outpath+"/condx"+stHour+".png")
-   plt.close("all")
-   print("Image generation for hour %s:00Z has been completed Spot(0)" % (lastHour))
-   lastHour=lastHour+1
-   map=None
-   map=buildMap()
+#while lastHour<24:
+#   x = datetime.datetime.now(datetime.UTC)
+#
+#   print_msg("----> Band %sMHz Processing spots for hour %d Spots(%d)" % (band,lastHour,c))
+#   f = datetime.datetime(x.year,x.month,x.day,lastHour,0,0)
+#
+#   CS=map.nightshade(f)
+#   if modeGIF == "SHADED":
+#      map.shadedrelief(scale=0.10)
+#   else:
+#      map.bluemarble(scale=0.10)
+#
+#   plt.title("Band %s MHz Hour %d:00Z" % (band,lastHour))
+#   if len(str(lastHour)) == 1:
+#      stHour="0"+str(lastHour)
+#   else:
+#      stHour=str(lastHour)
+#   print_msg("main: saving file %s" % (outpath+"/condx"+stHour+".png"))
+#   plt.savefig(outpath+"/condx"+stHour+".png")
+#   plt.close("all")
+#   print("Image generation for hour %s:00Z has been completed Spot(0)" % (lastHour))
+#   lastHour=lastHour+1
+#   map=None
+#   map=buildMap()
 
 #*---------------------------------------------------------------------------------------------
 #* Create GIF file 
 #*---------------------------------------------------------------------------------------------
-print_msg("Creating GIF at path: %s" % outGIF)
-images = []
-for file_name in sorted(os.listdir(outGIF)):
-    if file_name.endswith('.png'):
-        file_path = os.path.join(outGIF, file_name)
-        print("GIF Generation including file %s" % file_path)
-        images.append(imageio.imread(file_path))
-imageio.mimsave(outGIF+'/'+nameGIF+'.gif', images, duration=0.5)
+#print_msg("Creating GIF at path: %s" % outGIF)
+#images = []
+#for file_name in sorted(os.listdir(outGIF)):
+#    if file_name.endswith('.png'):
+#        file_path = os.path.join(outGIF, file_name)
+#        print("GIF Generation including file %s" % file_path)
+#        images.append(imageio.imread(file_path))
+#imageio.mimsave(outGIF+'/'+nameGIF+'.gif', images, duration=0.5)
