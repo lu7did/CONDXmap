@@ -5,7 +5,13 @@ from __future__ import with_statement
 #* csv2json.py
 #* Conector para transformar spot data en formato CSV a formato JSON
 #*
-#* By Dr. Pedro E. Colla (LU7DID)
+#* La extracción de datos se realiza con
+#
+#*     https://pskreporter.info/cgi-bin/pskdata.pl?callsign={CALLSIGN}
+#*
+#* By Dr. Pedro E. Colla (LU7DZ)
+#* License: MIT
+#* Free for amateur uses
 #*------------------------------------------------------------------------------------------------------
 import sys
 import csv
@@ -66,11 +72,6 @@ def freq2band(freq):
 #*------------------------------------------------------------------------------------------------------
 
 
-lastHour=0
-c=0
-MH= 'GF05te'
-VER='1.6'
-BUILD='10'
 script = sys.argv[0]
 i = 0
 v=False
@@ -80,25 +81,6 @@ outGIF='.'
 modeGIF='MARBLE'
 nameGIF='CONDX'
 
-while i < len(sys.argv): 
-   print_msg('Argument(%d) --> %s' % (i,sys.argv[i].upper()))
-   if sys.argv[i].upper() == '--H':
-      print('csv2json versión %s build %s' % (VER,BUILD))
-      print('   csv2json [--v] [--h]')
-      print('Versión corrientemente instalada %s' % (sys.version))
-      quit()
-   if (sys.argv[i].upper() == '--V') or (sys.argv[i].upper() == '-V'):
-      print_msg('main: Verbose mode activated')
-      v=True
-
-  
-   i=i+1
-
-print_msg('version es %s' % (sys.version))
-print_msg('verbose status %s ' % v)
-print_msg("*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=")
-
-
 scriptname   = os.path.basename(sys.argv[0])
 r=0
 VERSION="1.0"
@@ -106,6 +88,9 @@ VERSION="1.0"
 now = datetime.now()
 timestampStr = now.strftime("%Y-%m-%d %H:%M:%S")
 
+#*-------------------------------------------------------------------------------------
+#* Genera formato JSON con la salida
+#*-------------------------------------------------------------------------------------
 
 out="["
 out=out+('{"program" : "%s",\n' % (scriptname))
@@ -114,11 +99,11 @@ out=out+('"time" : "%s",\n' % (timestampStr))
 out=out+('"spot":[\n')
 
 #*-------------------------------------------------------------------------------------
-#* Scan data and build datasets
+#* Barre archivo CSV de entrada (por Std Input) 
 #*-------------------------------------------------------------------------------------
 for row in csv.reader(iter(sys.stdin.readline, ''),delimiter=','):
 
-#*--- Parse data out of the dataset
+#*--- Hace parse de la data 
 
     if r == 0:
        r=r+1
@@ -138,23 +123,26 @@ for row in csv.reader(iter(sys.stdin.readline, ''),delimiter=','):
     hour=int(time.split(':')[0])
     band=freq2band(freq)
 
-    data_string=(f"call:{fromCall}, mode:{mode}, band:{band},freq:{freq},mycall:{toCall},date:{day},time:{time},migrid:{fromLocator},grid:{toLocator}")
+    data_string=(f"call:{fromCall}, mode:{mode}, band:{band},freq:{freq},mycall:{toCall},date:{day},time:{time},migrid:{fromLocator},grid:{toLocator},SNR:{SNR}")
            
-# Initialize an empty dictionary to store the key-value pairs
+#*--- Inicializa un diccionario vacio y almacena los pares {clave/valor}
     data_dict = {}  
-        
-# Split the string into individual key-value pairs
+
+#*--- Hace split del string en valores individuales        
+
     pairs = data_string.split(',')
            
-# Iterate through each pair, split it into key and value, and add to the dictionary
+#*--- Itera en los pares
+
     for pair in pairs:
-        key_value = pair.split(':', 1) # Split only on the first colon to handle values containing colons
+        key_value = pair.split(':', 1)
         if len(key_value) == 2:
            key = key_value[0].strip()
            value = key_value[1].strip()
            data_dict[key] = value
            
-# Convert the Python dictionary to a JSON formatted string
+#*--- Convierte el diccionario Python en un string formateado con JSON
+
     json_output = json.dumps(data_dict, indent=4) # indent for pretty-printing
     out=out+json_output+",\n"
 

@@ -22,7 +22,7 @@ import sys
 import json
 from subprocess import PIPE,Popen
 import adif_io
-from html.parser import HTMLParser
+#from html.parser import HTMLParser
 import syslog
 import os
 #*-------------------------------------------------------------------------------------
@@ -80,45 +80,42 @@ def freq2band(freq):
 #*-------------------------------------------------------------------------------------
 #* HTML Parser
 #*-------------------------------------------------------------------------------------
-class MyHTMLParser(HTMLParser):
-    def handle_starttag(self, tag, attrs):
-        z=tag.rstrip().find("body")
-        if z>=0:
-           bFirst=False
-
-    def handle_endtag(self, tag):
-        z=tag.rstrip().find("body")
-        if z>=0:
-           bFirst=True
-
-    def handle_data(self, data):
-        data=removelines(data)
-        data=data.rstrip()
-        if data:
-           p=data.find("Warning:")
-           if p>=0:
-              return data.replace('\n','').replace('\r','')
-           p=data.find("Information:")
-           if p>=0:
-              return data.replace('\n','').replace('\r','')
-
+#class MyHTMLParser(HTMLParser):
+#    def handle_starttag(self, tag, attrs):
+#        z=tag.rstrip().find("body")
+#        if z>=0:
+#           bFirst=False
+#
+#    def handle_endtag(self, tag):
+#        z=tag.rstrip().find("body")
+#        if z>=0:
+#           bFirst=True
+#
+#    def handle_data(self, data):
+#        data=removelines(data)
+#        data=data.rstrip()
+#        if data:
+#           p=data.find("Warning:")
+#           if p>=0:
+#              return data.replace('\n','').replace('\r','')
+#           p=data.find("Information:")
+#           if p>=0:
+#              return data.replace('\n','').replace('\r','')
 #*===================================================================================================
 #*                                  M A I N
 #*===================================================================================================
 VERSION="1.0"
-#*---------------------------------------------------*
-#* Process arguments and format the query to qrz.com *
-#*---------------------------------------------------*
-if len(sys.argv) < 2:
-   print("%s: No ADIF file to process, terminating!\n" % pgm)
-   sys.exit()
-
 scriptname   = os.path.basename(sys.argv[0])
+
+if len(sys.argv) == 0:
+   print("*ERROR* debe ser informado archivo ADIF")
+   sys.exit(16)
 adifFile     = sys.argv[1]                                  # First argument is the adifFile to process
 dateTimeObj  = datetime.now()
 timestampStr = dateTimeObj.strftime("%d-%b-%Y (%H:%M:%S.%f)")
 
-parser=MyHTMLParser()
+#
+#parser=MyHTMLParser()
 #*---------------------------------------------------*
 #* Access the ADIF file and extract  pseudo XML data *
 #*-------------------------------------------------- *

@@ -26,7 +26,8 @@ import tempfile
 import shutil
 import subprocess
 import os
-import imageio
+#import imageio
+import imageio.v2 as imageio
 from collections import defaultdict
 import json
 
@@ -122,7 +123,7 @@ def band2color(band):
 #* Draw a line in the map given initial and ending coordinates expressed as Maindenhead locator
 #*------------------------------------------------------------------------------------------------------
 
-def plotMap(map,band,gFrom,gTo):
+def plotMap(map,band,gFrom,gTo,SNR):
 
     lonFrom,latFrom=GridToLatLong(gFrom.strip())
     lonTo,latTo=GridToLatLong(gTo.strip())
@@ -135,7 +136,6 @@ def plotMap(map,band,gFrom,gTo):
 
     lat = [laFrom,laTo] 
     lon = [loFrom,loTo] 
-
 
     r=band2color(band)
     x, y = map(lon, lat)
@@ -163,13 +163,16 @@ scriptname = sys.argv[0]
 infile="condx_hour"
 i = 0
 v=False
-
+VER="1.0"
+BUILD="000"
 gifpath='./out'
 jsonfile=''
 
 modeGIF='MARBLE'
 nameGIF='CONDX'
 n=0
+filterband="all"
+filtersnr=-30
 
 #*----- Procesa argumentos
 while i < len(sys.argv): 
@@ -185,6 +188,12 @@ while i < len(sys.argv):
       i=i+1
    if (sys.argv[i].upper() == '--GIF'):
       gifpath=sys.argv[i+1]
+
+   if (sys.argv[i].upper() == '--BAND'):
+      filterband=sys.argv[i+1].upper()
+
+   if (sys.argv[i].upper() == '--SNR'):
+      filtersnr=int(sys.argv[i+1])
       
       i=i+1
 
@@ -192,6 +201,9 @@ while i < len(sys.argv):
 
 if jsonfile == '':
    print("Json file must be informed, see condxmap --help")
+
+print(f'\n{scriptname} versión {VER} build {BUILD}')
+print(f"Process input({jsonfile}) gif({gifpath}) filter({filterband}) filtersnr({filtersnr})\n")
 
 #*------ Estructura para almacenar los spots por banda horaria
 condx = {i: [] for i in range(0, 24)}
@@ -222,17 +234,27 @@ for i, entry in enumerate(spots, start=1):
     freq=entry["freq"]
     toLocator=entry["migrid"]
     fromLocator=entry["grid"]
+    SNR=entry["SNR"]
+    if SNR == '':
+       SNR=-30
+    else:
+       SNR=int(SNR)
 
 #*-------------------------------------------------------------------------------------
 #* Scan data and build datasets
 #*-------------------------------------------------------------------------------------
     hour=int(timestamp.split(':')[0])
-    qso = (timestamp, toCall, band, freq, toLocator, fromCall, fromLocator)
-    condx[hour].append(qso)
+    qso = (timestamp, toCall, band, freq, toLocator, fromCall, fromLocator,SNR)
+    if (filterband != 'ALL' and band.upper() == filterband) or (filterband == 'ALL'):
+       print(f"SNR{SNR} filtersnr{filtersnr}")
+       if SNR>=filtersnr:
+          condx[hour].append(qso)
+          print("stored")
 
 
 for h in range(24):  # Iterates from 0 to 23
     qso = condx.get(h, [])
+
     if not qso:
        print(f"No hay spots guardados para la hora {h}.")
     else:
@@ -254,8 +276,8 @@ for h in range(24):  # Iterates from 0 to 23
        map=None
        map=buildMap()
 
-       for i, (timestamp, toCall, band, freq, toLocator, fromCall, fromLocator) in enumerate(qso, start=1):
-           plotMap(map,band,toLocator,fromLocator)
+       for i, (timestamp, toCall, band, freq, toLocator, fromCall, fromLocator,SNR) in enumerate(qso, start=1):
+           plotMap(map,band,toLocator,fromLocator,SNR)
            n=n+1
 
 print(f"total number of spots {n} number of JSON records {data[0]["records"]}")
