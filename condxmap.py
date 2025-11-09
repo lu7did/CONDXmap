@@ -136,7 +136,6 @@ def plotMap(map,band,gFrom,gTo,SNR):
 
     lat = [laFrom,laTo] 
     lon = [loFrom,loTo] 
-
     r=band2color(band)
     x, y = map(lon, lat)
     map.plot(x, y, 'o-', color=r,markersize=1, linewidth=1) 
@@ -172,6 +171,7 @@ modeGIF='MARBLE'
 nameGIF='CONDX'
 n=0
 filterband="all"
+
 filtersnr=-30
 
 #*----- Procesa argumentos
@@ -199,6 +199,7 @@ while i < len(sys.argv):
 
    i=i+1
 
+filterband=filterband.upper()
 if jsonfile == '':
    print("Json file must be informed, see condxmap --help")
 
@@ -230,6 +231,7 @@ for i, entry in enumerate(spots, start=1):
     band = entry["band"]
     toCall=entry["call"]
     fromCall=entry["mycall"]
+    date=entry["date"]
     timestamp=entry["time"]
     freq=entry["freq"]
     toLocator=entry["migrid"]
@@ -239,43 +241,39 @@ for i, entry in enumerate(spots, start=1):
        SNR=-30
     else:
        SNR=int(SNR)
-
 #*-------------------------------------------------------------------------------------
 #* Scan data and build datasets
 #*-------------------------------------------------------------------------------------
     hour=int(timestamp.split(':')[0])
+    yy=int(date.split("-")[0])
+    mm=int(date.split("-")[1])
+    dd=int(date.split("-")[2])
     qso = (timestamp, toCall, band, freq, toLocator, fromCall, fromLocator,SNR)
     if (filterband != 'ALL' and band.upper() == filterband) or (filterband == 'ALL'):
-       print(f"SNR{SNR} filtersnr{filtersnr}")
        if SNR>=filtersnr:
           condx[hour].append(qso)
-          print("stored")
-
 
 for h in range(24):  # Iterates from 0 to 23
     qso = condx.get(h, [])
-
-    if not qso:
-       print(f"No hay spots guardados para la hora {h}.")
+    title=f"Propagation Report Hour {h}:00Z\nBand {filterband} SNR > {filtersnr} dB"
+    f = datetime.datetime(yy,mm,dd,h,0,0)
+    CS=map.nightshade(f)
+    if (modeGIF=="SHADED"):
+       map.shadedrelief(scale=0.1)
     else:
-       n=n+1
-       x = datetime.datetime.now(datetime.UTC)
-       f = datetime.datetime(x.year,x.month,x.day,h,0,0)
-       CS=map.nightshade(f)
-       if (modeGIF=="SHADED"):
-          map.shadedrelief(scale=0.1)
-       else:
-          map.bluemarble(scale=0.1)
-       plt.title("Propagation Report Hour %d:00Z" % (h))
-       if len(str(h)) == 1:
-          stHour="0"+str(h)
-       else:
-          stHour=str(h)
-       plt.savefig(gifpath+"/condx_"+stHour+".png")
-       plt.close("all")
-       map=None
-       map=buildMap()
+       map.bluemarble(scale=0.1)
+    plt.title(title)
+    if len(str(h)) == 1:
+       stHour="0"+str(h)
+    else:
+       stHour=str(h)
+    plt.savefig(gifpath+"/condx_"+stHour+".png")
+    plt.close("all")
+    map=None
+    map=buildMap()
 
+    if qso:
+       n=n+1
        for i, (timestamp, toCall, band, freq, toLocator, fromCall, fromLocator,SNR) in enumerate(qso, start=1):
            plotMap(map,band,toLocator,fromLocator,SNR)
            n=n+1

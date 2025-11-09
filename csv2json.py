@@ -110,31 +110,32 @@ for row in csv.reader(iter(sys.stdin.readline, ''),delimiter=','):
        continue
 
     r=r+1
-    SNR=row[0]
-    mode=row[1]
-    freq=row[2]
-    timestamp=row[3]
-    day=timestamp.split(' ')[0]
-    time=timestamp.split(' ')[1]
-    fromCall=row[6]
-    fromLocator=row[7]
-    toCall=row[8]
-    toLocator=row[9]    
-    hour=int(time.split(':')[0])
-    band=freq2band(freq)
+    try:
+       SNR=row[0]
+       mode=row[1]
+       freq=row[2]
+       timestamp=row[3]
+       day=timestamp.split(' ')[0]
+       time=timestamp.split(' ')[1]
+       fromCall=row[6]
+       fromLocator=row[7]
+       toCall=row[8]
+       toLocator=row[9]    
+       hour=int(time.split(':')[0])
+       band=freq2band(freq)
 
-    data_string=(f"call:{fromCall}, mode:{mode}, band:{band},freq:{freq},mycall:{toCall},date:{day},time:{time},migrid:{fromLocator},grid:{toLocator},SNR:{SNR}")
+       data_string=(f"call:{fromCall}, mode:{mode}, band:{band},freq:{freq},mycall:{toCall},date:{day},time:{time},migrid:{fromLocator},grid:{toLocator},SNR:{SNR}")
            
 #*--- Inicializa un diccionario vacio y almacena los pares {clave/valor}
-    data_dict = {}  
+       data_dict = {}  
 
 #*--- Hace split del string en valores individuales        
 
-    pairs = data_string.split(',')
+       pairs = data_string.split(',')
            
 #*--- Itera en los pares
 
-    for pair in pairs:
+       for pair in pairs:
         key_value = pair.split(':', 1)
         if len(key_value) == 2:
            key = key_value[0].strip()
@@ -143,9 +144,10 @@ for row in csv.reader(iter(sys.stdin.readline, ''),delimiter=','):
            
 #*--- Convierte el diccionario Python en un string formateado con JSON
 
-    json_output = json.dumps(data_dict, indent=4) # indent for pretty-printing
-    out=out+json_output+",\n"
-
+       json_output = json.dumps(data_dict, indent=4) # indent for pretty-printing
+       out=out+json_output+",\n"
+    except:
+       pass
 out= out[:-2]
 out= out+"],"
 out= out+('"records" : "%d"}]' % (r-1))
